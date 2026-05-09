@@ -55,8 +55,8 @@ app.post("/api/gemini", async (req, res) => {
     const { model, payload } = req.body;
     const ai = new GoogleGenAI({ apiKey });
 
-    // 默认使用 Gemini 2.5 Flash 或根据请求指定
-    const modelId = model || "gemini-2.5-flash";
+    // 默认使用 Gemini 2.5 Flash Image 或根据请求指定
+    const modelId = model || "gemini-2.5-flash-image";
     
     // 提取图像数据（如果存在）
     const { prompt, images, aspectRatio = "1:1", imageSize = "1K" } = payload;
