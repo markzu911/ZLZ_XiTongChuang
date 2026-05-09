@@ -155,13 +155,42 @@ export default function App() {
   const [resolution, setResolution] = useState('2k'); // 1k, 2k, 4k
   const [ratio, setRatio] = useState('1:1'); // 1:1, 3:4, 4:3, 16:9
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'villa' | 'product') => {
+  const compressImage = (dataUrl: string, maxWidth = 1600, quality = 0.85): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth || height > maxWidth) {
+          if (width > height) {
+            height *= maxWidth / width;
+            width = maxWidth;
+          } else {
+            width *= maxWidth / height;
+            height = maxWidth;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = dataUrl;
+    });
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'villa' | 'product') => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        if (type === 'villa') setVillaImage(reader.result as string);
-        else setProductImage(reader.result as string);
+      reader.onloadend = async () => {
+        const compressed = await compressImage(reader.result as string);
+        if (type === 'villa') setVillaImage(compressed);
+        else setProductImage(compressed);
       };
       reader.readAsDataURL(file);
     }
@@ -547,7 +576,7 @@ export default function App() {
                           <label className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center p-6 text-center">
                             <Upload className="mb-4 text-slate-400 group-hover:text-blue-500 transition-colors" size={48} />
                             <span className="text-slate-900 font-bold">点击上传</span>
-                            <span className="text-slate-400 text-xs mt-2">支持 JPG, PNG 格式</span>
+                            <span className="text-slate-400 text-[10px] mt-2 px-4 leading-tight">支持常见图片格式（如 JPG, PNG, WebP），最大支持 20MB（通过前端压缩上传）</span>
                             <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'villa')} />
                           </label>
                         )}
@@ -575,7 +604,7 @@ export default function App() {
                         <label className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center p-6 text-center">
                           <Upload className="mb-4 text-slate-400 group-hover:text-blue-500 transition-colors" size={48} />
                           <span className="text-slate-900 font-bold">点击上传</span>
-                          <span className="text-slate-400 text-xs mt-2">支持 JPG, PNG 格式</span>
+                          <span className="text-slate-400 text-[10px] mt-2 px-4 leading-tight">支持常见图片格式（如 JPG, PNG, WebP），最大支持 20MB（通过前端压缩上传）</span>
                           <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'product')} />
                         </label>
                       )}
