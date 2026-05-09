@@ -15,7 +15,7 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json({ limit: '50mb' }));
+  app.use(express.json({ limit: '20mb' }));
 
   // CORS and CSP Headers for SaaS Iframe integration
   app.use((req, res, next) => {
