@@ -253,7 +253,7 @@ export default function App() {
       
       let prompt = "";
       if (angle === 'default') {
-        prompt = "ARCHITECTURAL TRANSFORMATION: 1. Use the villa image (image 1) as the structural template. 2. Replace all windows/doors with the EXACT system window model from the product image (image 2). 3. CRITICAL: Replicate the EXACT internal mullion patterns, decorative grilles (如新中式格条), and lattice designs from image 2. 4. Extract exact frame finish, metallic color, and hardware details. 5. If image 1 is interior, beautify walls/furniture; if exterior, upgrade facade to premium stone. 6. Final output must match the intricate window patterns of image 2 perfectly.";
+        prompt = "ARCHITECTURAL TRANSFORMATION: 1. Use the villa image (image 1) as the structural template. 2. Replace all windows/doors with the EXACT system window model from the product image (image 2). 3. CRITICAL: Replicate the EXACT internal mullion patterns, decorative grilles , and lattice designs from image 2. 4. Extract exact frame finish, metallic color, and hardware details. 5. If image 1 is interior, beautify walls/furniture; if exterior, upgrade facade to premium stone. 6. Final output must match the intricate window patterns of image 2 perfectly.";
       } else if (angle === 'interior') {
         prompt = "STRICT INTERIOR COMPOSITE: 1. Preserve the window silhouettes from image 1. 2. Apply the EXACT frame profiles and internal decorative grilles (窗棂纹路) from the product image (image 2). 3. Replicate the specific glass texture and transparency. 4. Beautify the space with luxury wall textures and lighting while ensuring the window's internal patterns are the focal point. 5. Maintain high-end architectural rendering quality.";
       } else if (angle === 'high') {
