@@ -253,13 +253,13 @@ export default function App() {
       
       let prompt = "";
       if (angle === 'default') {
-        prompt = "ARCHITECTURAL TRANSFORMATION: 1. Use the villa image (image 1) as the structural template. 2. Replace all windows/doors with the EXACT system window model from the product image (image 2). 3. CRITICAL: Replicate the EXACT internal mullion patterns, decorative grilles , and lattice designs from image 2. 4. Extract exact frame finish, metallic color, and hardware details. 5. If image 1 is interior, beautify walls/furniture; if exterior, upgrade facade to premium stone. 6. Final output must match the intricate window patterns of image 2 perfectly.";
+        prompt = "ARCHITECTURAL TRANSFORMATION: 1. Use the villa image (image 1) as the structural template. 2. Replace all windows/doors with the EXACT system window model from the product image (image 2). 3. CRITICAL: Replicate the EXACT internal mullion patterns, decorative grilles, and lattice designs from image 2. 4. Extract exact frame finish, metallic color, and hardware details. 5. If image 1 is interior, beautify walls/furniture; if exterior, upgrade facade to premium stone. 6. Final output must match the intricate window patterns of image 2 perfectly.";
       } else if (angle === 'interior') {
-        prompt = "STRICT INTERIOR COMPOSITE: 1. Preserve the window silhouettes from image 1. 2. Apply the EXACT frame profiles and internal decorative grilles (窗棂纹路) from the product image (image 2). 3. Replicate the specific glass texture and transparency. 4. Beautify the space with luxury wall textures and lighting while ensuring the window's internal patterns are the focal point. 5. Maintain high-end architectural rendering quality.";
+        prompt = "STRICT INTERIOR COMPOSITE: 1. Preserve the window silhouettes from image 1. 2. Apply the EXACT frame profiles and internal decorative grilles from the product image (image 2). 3. Replicate the specific glass texture and transparency. 4. Beautify the space with luxury wall textures and lighting while ensuring the window's internal patterns are the focal point. 5. Maintain high-end architectural rendering quality.";
       } else if (angle === 'high') {
-        prompt = "AERIAL BIRD'S-EYE VIEW RENDERING: 1. Use the villa image (image 1) as the absolute structural template for a HIGH-ANGLE (aerial) perspective. 2. Replace all windows/doors with the EXACT system window model and intricate internal patterns (like New Chinese Style lattice) from image 2. 3. Ensure the final result maintains the perspective of image 1 but as a fully finished luxury villa with high-end landscaping (gardens, pools) seen from above. 4. The window frame colors, textures, and decorative grilles must match image 2 with 100% fidelity. 5. High-end promotional architectural visualization quality.";
+        prompt = "AERIAL BIRD'S-EYE VIEW RENDERING: 1. Use the villa image (image 1) as the absolute structural template for a HIGH-ANGLE (aerial) perspective. 2. Replace all windows/doors with the EXACT system window model and intricate internal patterns from image 2. 3. Ensure the final result maintains the perspective of image 1 but as a fully finished luxury villa with high-end landscaping (gardens, pools) seen from above. 4. The window frame colors, textures, and decorative grilles must match image 2 with 100% fidelity. 5. High-end promotional architectural visualization quality.";
       } else if (angle === 'detail') {
-        prompt = "MACRO PRODUCT DETAIL: Create an extreme close-up of the system window from image 1. Focus on the 'internal pattern' (局部纹路特写). 1. Show the precise joinery of the decorative grilles (格条工艺). 2. Highlight the surface texture (e.g., fine sand grain, wood grain). 3. Show the interaction between the patterned grilles and the glass texture. 4. Professional studio lighting on a neutral background.";
+        prompt = "MACRO PRODUCT DETAIL: Create an extreme close-up of the system window from image 1. Focus on the 'internal pattern' (局部纹路特写). 1. Show the precise joinery of the decorative grilles. 2. Highlight the surface texture (e.g., fine sand grain, wood grain). 3. Show the interaction between the patterned grilles and the glass texture. 4. Professional studio lighting on a neutral background.";
       }
 
       // Merge SaaS Context and Prompts
@@ -280,7 +280,7 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "gemini-2.5-flash-image",
+          model: "gemini-3.1-flash-image-preview",
           payload
         }),
       });
@@ -312,7 +312,7 @@ export default function App() {
           type: 'SAAS_CONSUME',
           userId,
           toolId,
-          requestId: crypto.randomUUID()
+          requestId: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2, 11)
         }, '*');
 
         // Also update locally to keep UI consistent if direct API is preferred or as fallback if parent doesn't reply
