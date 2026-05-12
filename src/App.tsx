@@ -305,18 +305,19 @@ export default function App() {
       };
       setHistory(prev => [newHistoryItem, ...prev]);
 
-      // --- Step 3: Consume Integral ---
+      // --- Step 3: Consume Integral & Save Result Image ---
       if (userId && toolId) {
-        // Option B: postMessage to Parent for consumption as per recommendation
-        window.parent.postMessage({
-          type: 'SAAS_CONSUME',
-          userId,
-          toolId,
-          requestId: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2, 11)
-        }, '*');
-
-        // Also update locally to keep UI consistent if direct API is preferred or as fallback if parent doesn't reply
+        // 1. Consume
         try {
+          // Option B: postMessage to Parent for consumption as per recommendation
+          window.parent.postMessage({
+            type: 'SAAS_CONSUME',
+            userId,
+            toolId,
+            requestId: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2, 11)
+          }, '*');
+
+          // Direct call as fallback/sync
           const consumeRes = await fetch('/api/tool/consume', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -327,7 +328,23 @@ export default function App() {
             setUserIntegral(consumeData.data.currentIntegral);
           }
         } catch (e) {
-          console.warn("Direct consume call failed, relying on postMessage");
+          console.warn("Consume call error", e);
+        }
+
+        // 2. Upload result to SaaS records
+        try {
+          await fetch('/api/upload/image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId,
+              base64: finalUrl,
+              source: 'result'
+            })
+          });
+          console.log("Result image uploaded to SaaS successfully");
+        } catch (e) {
+          console.error("Failed to upload result to SaaS", e);
         }
       }
 
