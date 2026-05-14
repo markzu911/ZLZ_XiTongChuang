@@ -91,6 +91,22 @@ export default function App() {
 
   // Filter invalid "null"/"undefined" strings from external args
   const cleanId = (id: any) => (id === "null" || id === "undefined" || !id) ? null : String(id);
+  
+  // Robust JSON reader to prevent "Unexpected token '<'" errors
+  const readJsonResponse = async (res: Response): Promise<any> => {
+    const text = await res.text();
+    let data: any = { success: false, error: "", message: "" };
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { success: false, error: text.slice(0, 300), message: "解析响应失败" };
+    }
+    
+    if (!res.ok || data.success === false) {
+      throw new Error(data.error || data.message || `请求失败: ${res.status}`);
+    }
+    return data;
+  };
 
   const fetchLaunchInfo = useCallback(async (uId: string, tId: string) => {
     try {
@@ -99,14 +115,14 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: uId, toolId: tId })
       });
-      const result = await res.json();
+      const result = await readJsonResponse(res);
       if (result.success) {
         setUserName(result.data.user.name);
         setEnterprise(result.data.user.enterprise);
         setUserIntegral(result.data.user.integral);
         setToolIntegral(result.data.tool.integral);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Launch fetch failed", err);
     }
   }, []);
@@ -241,10 +257,7 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, toolId })
         });
-        const verifyData = await verifyRes.json();
-        if (!verifyData.success) {
-          throw new Error(verifyData.message || "积分不足");
-        }
+        const verifyData = await readJsonResponse(verifyRes);
         setUserIntegral(verifyData.data.currentIntegral);
       }
 
@@ -276,7 +289,7 @@ export default function App() {
         images: isDetail ? [{ image_url: productImage }] : [{ image_url: villaImage }, { image_url: productImage }]
       };
 
-      const res = await fetch(endpoint, {
+      const aiRes = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -285,12 +298,8 @@ export default function App() {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error?.message || data.error || 'Failed to generate image');
-      }
-
-      const b64 = data.data[0].b64_json;
+      const aiData = await readJsonResponse(aiRes);
+      const b64 = aiData.data[0].b64_json;
       const finalUrl = `data:image/png;base64,${b64}`;
       setResultImage(finalUrl);
 
@@ -305,11 +314,10 @@ export default function App() {
       };
       setHistory(prev => [newHistoryItem, ...prev]);
 
-      // --- Step 3: Consume Integral & Save Result Image ---
+      // --- Step 3: Standard Results Persistence Flow ---
       if (userId && toolId) {
-        // 1. Consume
+        // 1. Consume Integral
         try {
-          // Option B: postMessage to Parent for consumption as per recommendation
           window.parent.postMessage({
             type: 'SAAS_CONSUME',
             userId,
@@ -317,34 +325,57 @@ export default function App() {
             requestId: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2, 11)
           }, '*');
 
-          // Direct call as fallback/sync
           const consumeRes = await fetch('/api/tool/consume', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId, toolId })
           });
-          const consumeData = await consumeRes.json();
-          if (consumeData.success) {
-            setUserIntegral(consumeData.data.currentIntegral);
-          }
+          const consumeData = await readJsonResponse(consumeRes);
+          setUserIntegral(consumeData.data.currentIntegral);
         } catch (e) {
-          console.warn("Consume call error", e);
+          console.warn("Consume failed", e);
         }
 
-        // 2. Upload result to SaaS records
+        // 2. Upload and Commit (Result Persistence)
         try {
-          await fetch('/api/upload/image', {
+          const fetchRes = await fetch(finalUrl);
+          const blob = await fetchRes.blob();
+          
+          const tokenRes = await fetch('/api/upload/direct-token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               userId,
-              base64: finalUrl,
-              source: 'result'
+              toolId,
+              source: 'result',
+              mimeType: blob.type || 'image/png',
+              fileName: `result-${Date.now()}.png`,
+              fileSize: blob.size
             })
           });
-          console.log("Result image uploaded to SaaS successfully");
+          const token = await readJsonResponse(tokenRes);
+
+          await fetch(token.uploadUrl, {
+            method: token.method || 'PUT',
+            headers: token.headers,
+            body: blob
+          });
+
+          const commitRes = await fetch('/api/upload/commit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId,
+              toolId,
+              source: 'result',
+              objectKey: token.objectKey,
+              fileSize: blob.size
+            })
+          });
+          await readJsonResponse(commitRes);
+          console.log("Result persisted successfully");
         } catch (e) {
-          console.error("Failed to upload result to SaaS", e);
+          console.error("Persistence error", e);
         }
       }
 
