@@ -421,10 +421,10 @@ export default function App() {
             {/* View selectors styled as navigation tabs */}
             <div className="flex flex-col space-y-1">
               {[
-                { id: 'default', label: '构图分析与产品替换', sub: '替换原有建筑面窗户', icon: <Layout size={16} /> },
-                { id: 'interior', label: '风格直接融合生成', sub: '阳光房与室内全景重塑', icon: <Home size={16} /> },
-                { id: 'high', label: '模拟俯拍重绘', sub: '无人机高视角融合', icon: <Maximize size={16} /> },
-                { id: 'detail', label: '局部细节', sub: '型材剖面与特写超分', icon: <Box size={16} /> },
+                { id: 'default', label: '室外默认场景', sub: '替换原有建筑面窗户', icon: <Layout size={16} /> },
+                { id: 'interior', label: '室内场景', sub: '阳光房与室内全景重塑', icon: <Home size={16} /> },
+                { id: 'high', label: '高空俯拍视角', sub: '无人机高视角融合', icon: <Maximize size={16} /> },
+                { id: 'detail', label: '产品局部细节', sub: '型材剖面与特写超分', icon: <Box size={16} /> },
               ].map((v) => {
                 const isActive = angle === v.id;
                 return (
