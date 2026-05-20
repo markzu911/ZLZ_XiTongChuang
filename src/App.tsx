@@ -53,6 +53,9 @@ export default function App() {
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [previewImage, setPreviewImage] = useState<GeneratedImage | null>(null);
 
+  // --- Sidebar States ---
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
   // --- SaaS Integration States ---
   const [userId, setUserId] = useState<string | null>(null);
   const [toolId, setToolId] = useState<string | null>(null);
@@ -288,6 +291,7 @@ export default function App() {
         quality: resolution,
       };
       setHistory(prev => [newHistoryItem, ...prev]);
+      setPreviewImage(newHistoryItem);
 
       // --- Step 3: Standard Results Persistence Flow ---
       if (userId && toolId) {
@@ -379,313 +383,406 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen pb-12">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 py-4 px-6 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-2 cursor-pointer" onClick={resetAll}>
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white">
-              <Layout size={24} />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold leading-tight">AI Window</h1>
-              <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Architectural Suite</p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            {userId && (
-              <>
-                {/* Desktop Account Info */}
-                <div className="hidden md:flex items-center space-x-3 px-4 py-2 bg-slate-50 rounded-xl border border-slate-100">
-                  <div className="flex flex-col items-end">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">Account</span>
-                    <span className="text-xs font-bold text-slate-700">{userName || userId}</span>
-                  </div>
-                  <div className="w-px h-6 bg-slate-200" />
-                  <div className="flex items-center space-x-2">
-                    <div className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-amber-600">
-                      <Coins size={14} />
-                    </div>
-                    <span className="text-sm font-bold text-amber-600">{userIntegral}</span>
-                  </div>
-                </div>
-                {/* Mobile Integral Only */}
-                <div className="flex md:hidden items-center space-x-1 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100">
-                  <Coins size={14} className="text-amber-600" />
-                  <span className="text-xs font-bold text-amber-600">{userIntegral}</span>
-                </div>
-              </>
-            )}
-            <button 
-              onClick={() => setShowHistoryPanel(!showHistoryPanel)} 
-              className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors relative group"
-            >
-              <History size={20} />
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 text-white text-[10px] rounded-full flex items-center justify-center">
-                {history.length}
-              </span>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-6 mt-8">
-        <AnimatePresence mode="wait">
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="grid grid-cols-1 lg:grid-cols-12 gap-x-8 gap-y-6 items-stretch"
-          >
-            {/* Villa Scene block */}
-            <div className="lg:col-span-5">
-              {angle !== 'detail' ? (
-                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4 h-full">
-                  <div className="flex items-center space-x-2 text-slate-900 font-bold border-b border-slate-100 pb-4">
-                    <Camera size={20} className="text-blue-600" />
-                    <span>
-                      {angle === 'default' && "别墅场景图 (别墅外观)"}
-                      {angle === 'interior' && "别墅场景图 (别墅室内)"}
-                      {angle === 'high' && "别墅场景图 (别墅俯视)"}
-                    </span>
-                  </div>
-                  <div className="relative aspect-video bg-white border-2 border-dashed border-slate-200 rounded-3xl overflow-hidden group hover:border-blue-400 transition-colors">
-                    {villaImage ? (
-                      <>
-                        <img src={villaImage} className="w-full h-full object-cover" alt="Villa" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <label className="cursor-pointer bg-white text-slate-900 px-4 py-2 rounded-full text-sm font-bold shadow-lg leading-none">
-                            重新上传
-                            <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'villa')} />
-                          </label>
-                        </div>
-                      </>
-                    ) : (
-                      <label className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center p-6 text-center">
-                        <Upload className="mb-4 text-slate-400 group-hover:text-blue-500 transition-colors" size={48} />
-                        <span className="text-slate-900 font-bold">
-                          {angle === 'default' && "点击上传别墅外观图"}
-                          {angle === 'interior' && "点击上传别墅室内图"}
-                          {angle === 'high' && "点击上传别墅俯视图"}
-                        </span>
-                        <span className="text-slate-400 text-[10px] mt-2 px-4 leading-tight">支持 JPG, PNG, WebP，最大 20MB</span>
-                        <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'villa')} />
-                      </label>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="aspect-video h-full bg-slate-50 border border-dashed border-slate-200 rounded-3xl flex items-center justify-center p-8 text-center">
-                  <p className="text-slate-400 text-sm">细节视角模式下无需上传别墅场景图</p>
+    <div className="min-h-screen bg-[#f8fbfa] flex flex-col md:flex-row text-slate-900 font-sans">
+      {/* Left Sidebar Section */}
+      <aside className={`w-full ${isSidebarCollapsed ? 'md:w-16' : 'md:w-64'} bg-white border-b md:border-b-0 md:border-r border-slate-100 ${isSidebarCollapsed ? 'p-3' : 'p-5'} flex flex-col justify-between shrink-0 md:h-screen md:sticky md:top-0 transition-all duration-300 z-45`}>
+        <div className="space-y-6">
+          {/* Logo & Brand */}
+          <div className={`flex ${isSidebarCollapsed ? 'flex-col space-y-4 items-center' : 'items-center justify-between'} w-full`}>
+            <div className="flex items-center space-x-2 cursor-pointer" onClick={resetAll}>
+              <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-blue-100 shrink-0">
+                <Layout size={18} className="stroke-[2.5]" />
+              </div>
+              {!isSidebarCollapsed && (
+                <div className="flex flex-col">
+                  <h1 className="text-sm font-black tracking-tight text-slate-900 leading-none">AI Window</h1>
+                  <p className="text-[8px] text-slate-400 uppercase tracking-widest font-black">Architectural Suite</p>
                 </div>
               )}
             </div>
+            
+            <button 
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className="p-1.5 hover:bg-slate-50 text-slate-400 hover:text-slate-850 rounded-lg transition-all border border-slate-100 hidden md:inline-flex items-center justify-center"
+              title={isSidebarCollapsed ? "展开菜单" : "收起菜单"}
+            >
+              <ChevronRight size={14} className={`transform transition-transform duration-300 ${isSidebarCollapsed ? '' : 'rotate-180'}`} />
+            </button>
+          </div>
 
-            {/* Unified Control Panel (Right) spans 3 logical rows to align with Info Card bottom */}
-            <div className="lg:col-span-7 lg:row-span-3">
-              <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-8 h-full flex flex-col">
-                <div className="flex-1 space-y-8 overflow-y-auto pr-2 custom-scrollbar">
-                  {/* Viewport Selection */}
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-2 text-slate-900 font-bold border-b border-slate-100 pb-4">
-                      <Layout size={20} className="text-blue-600" />
-                      <span>选择视角</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { id: 'default', label: '别墅外观' },
-                        { id: 'interior', label: '别墅室内' },
-                        { id: 'high', label: '模拟俯拍' },
-                        { id: 'detail', label: '局部细节' },
-                      ].map((v) => (
-                        <button
-                          key={v.id}
-                          onClick={() => {
-                            setAngle(v.id as ViewAngle);
-                            setVillaImage(null);
-                            setProductImage(null);
-                            setResultImage(null);
-                          }}
-                          className={`py-3 px-4 rounded-xl text-sm font-bold transition-all border ${
-                            angle === v.id 
-                              ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100' 
-                              : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600'
-                          }`}
-                        >
+          {/* Navigation Menu Header */}
+          <div className="space-y-2">
+            {!isSidebarCollapsed && (
+              <div className="px-1 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center md:text-left">
+                导航菜单
+              </div>
+            )}
+            
+            {/* View selectors styled as navigation tabs */}
+            <div className="flex flex-col space-y-1">
+              {[
+                { id: 'default', label: '构图分析与产品替换', sub: '替换原有建筑面窗户', icon: <Layout size={16} /> },
+                { id: 'interior', label: '风格直接融合生成', sub: '阳光房与室内全景重塑', icon: <Home size={16} /> },
+                { id: 'high', label: '模拟俯拍重绘', sub: '无人机高视角融合', icon: <Maximize size={16} /> },
+                { id: 'detail', label: '局部细节', sub: '型材剖面与特写超分', icon: <Box size={16} /> },
+              ].map((v) => {
+                const isActive = angle === v.id;
+                return (
+                  <button
+                    key={v.id}
+                    title={v.label}
+                    onClick={() => {
+                      setAngle(v.id as ViewAngle);
+                      setVillaImage(null);
+                      setProductImage(null);
+                      setResultImage(null);
+                    }}
+                    className={`w-full transition-all duration-200 group flex ${
+                      isSidebarCollapsed 
+                        ? 'items-center justify-center p-2.5 rounded-lg' 
+                        : 'flex-col space-y-0.5 p-2.5 rounded-xl text-center md:text-left'
+                    } ${
+                      isActive 
+                        ? 'bg-[#f4f7f6] text-blue-600 border border-slate-100 shadow-sm' 
+                        : 'bg-transparent text-slate-500 hover:text-slate-850 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2 w-full justify-center md:justify-start">
+                      <span className={`${isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
+                        {v.icon}
+                      </span>
+                      {!isSidebarCollapsed && (
+                        <span className={`text-xs font-bold leading-none ${isActive ? 'text-blue-650 font-black' : 'text-slate-700'}`}>
                           {v.label}
-                        </button>
-                      ))}
+                        </span>
+                      )}
+                    </div>
+                    {!isSidebarCollapsed && (
+                      <span className="text-[9px] text-slate-400 font-medium pl-0 md:pl-6 block truncate w-full text-center md:text-left mt-0.5 md:mt-0">
+                        {v.sub}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Info Card block (Operation Guide) */}
+          {!isSidebarCollapsed && (
+            <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-50 space-y-2.5">
+              <h4 className="text-blue-900 font-bold flex items-center border-b border-blue-100/20 pb-1.5 text-[11px]">
+                <CheckCircle2 size={12} className="mr-1 text-blue-600" />
+                <span>操作指南</span>
+              </h4>
+              <ul className="text-[10px] text-blue-950/80 space-y-1.5 leading-relaxed">
+                {angle !== 'detail' ? (
+                  <>
+                    <li className="flex items-start gap-1">
+                      <span className="flex items-center justify-center w-3 h-3 rounded-full bg-blue-100 text-blue-600 text-[8px] font-bold shrink-0 mt-0.5">1</span>
+                      <span>上传别墅原始照片</span>
+                    </li>
+                    <li className="flex items-start gap-1">
+                      <span className="flex items-center justify-center w-3 h-3 rounded-full bg-blue-100 text-blue-600 text-[8px] font-bold shrink-0 mt-0.5">2</span>
+                      <span>上传系统窗产品样图</span>
+                    </li>
+                    <li className="flex items-start gap-1">
+                      <span className="flex items-center justify-center w-3 h-3 rounded-full bg-blue-100 text-blue-600 text-[8px] font-bold shrink-0 mt-0.5">3</span>
+                      <span>AI智能完美融合替换</span>
+                    </li>
+                  </>
+                ) : (
+                  <>
+                    <li className="flex items-start gap-1">
+                      <span className="flex items-center justify-center w-3 h-3 rounded-full bg-blue-100 text-blue-600 text-[8px] font-bold shrink-0 mt-0.5">1</span>
+                      <span>上传材料/型材切角特写</span>
+                    </li>
+                    <li className="flex items-start gap-1">
+                      <span className="flex items-center justify-center w-3 h-3 rounded-full bg-blue-100 text-blue-600 text-[8px] font-bold shrink-0 mt-0.5">2</span>
+                      <span>AI渲染高保真材质重绘</span>
+                    </li>
+                  </>
+                )}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* User Card at the very bottom */}
+        {userId && (
+          <div className={`mt-6 ${isSidebarCollapsed ? 'p-1.5 flex flex-col items-center justify-center space-y-2' : 'p-3.5 space-y-2.5 bg-[#f8fcfb] rounded-xl border border-slate-50'} transition-all`}>
+            {isSidebarCollapsed ? (
+              <div className="flex flex-col items-center space-y-1.5" title={`${userName || userId}: ${userIntegral} 积分`}>
+                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-50 shrink-0">
+                  <User size={14} />
+                </div>
+                <div className="flex items-center space-x-0.5 text-amber-600 text-[10px] font-bold">
+                  <span>{userIntegral}分</span>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-50 shrink-0">
+                    <User size={14} />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-bold text-slate-800 truncate">{userName || userId}</span>
+                    <span className="text-[9px] text-slate-400 font-medium">体验用户</span>
+                  </div>
+                </div>
+                
+                <div className="h-px bg-slate-50" />
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1.5 text-amber-600">
+                    <Coins size={13} />
+                    <span className="text-[11px] font-bold">{userIntegral} 积分</span>
+                  </div>
+                  <span className="text-[8px] text-slate-400 font-medium">10分/次</span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </aside>
+
+      {/* Main Workspace content */}
+      <main className="flex-1 overflow-y-auto px-6 py-10 lg:px-12">
+        <div className="max-w-[1300px] mx-auto w-full">
+          {/* Workspace Header */}
+          <div className="mb-8 space-y-2">
+            <h2 className="text-3xl font-black tracking-tight text-slate-900">
+              {angle === 'default' && "构图分析与产品无缝融合替换"}
+              {angle === 'interior' && "风格直接融合生成"}
+              {angle === 'high' && "模拟俯拍与产品融合"}
+              {angle === 'detail' && "型材剖面与产品局部细节重绘"}
+            </h2>
+            <p className="text-sm text-slate-500 max-w-3xl leading-relaxed">
+              {angle === 'detail' 
+                ? "上传系统窗或型材切面特写大图，自动极佳生成局部纹理特写。无需上传别墅场景图。" 
+                : "上传一张参考构图图片，自动识别要保留的背景与环境元素，并把您的新产品无缝替换融合进去。"}
+            </p>
+          </div>
+
+          <AnimatePresence mode="wait">
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="grid grid-cols-1 lg:grid-cols-12 gap-x-8 gap-y-6 items-stretch w-full"
+            >
+              {/* Column 2: Middle Pane (Upload original scene and product sample in a compact side-by-side layout) */}
+              <div className={`lg:col-span-8 flex flex-col justify-start gap-4 ${angle === 'detail' ? 'max-w-xl mx-auto w-full' : ''}`}>
+                {angle !== 'detail' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch w-full">
+                    {/* Step 1: Villa Scene block */}
+                    <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200/50 shadow-sm flex flex-col justify-between space-y-3">
+                      <div className="flex items-center space-x-2 text-slate-800 font-bold border-b border-slate-50 pb-2.5">
+                        <Camera size={16} className="text-blue-600 shrink-0" />
+                        <span className="text-xs md:text-sm">
+                          步骤 1: 上传场景图 (环境光影参考)
+                        </span>
+                      </div>
+                      <div className="relative aspect-[4/3] bg-slate-50 border-2 border-dashed border-slate-200/60 rounded-xl overflow-hidden group hover:border-blue-500 transition-colors flex-1 flex items-center justify-center">
+                        {villaImage ? (
+                          <>
+                            <img src={villaImage} className="w-full h-full object-cover" alt="Villa" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <label className="cursor-pointer bg-white text-slate-950 px-4 py-2 rounded-full text-xs font-bold shadow-lg leading-none">
+                                重新上传
+                                <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'villa')} />
+                              </label>
+                            </div>
+                          </>
+                        ) : (
+                          <label className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center p-4 text-center">
+                            <Upload className="mb-2 text-slate-400 group-hover:text-blue-500 transition-colors" size={30} />
+                            <span className="text-slate-900 font-bold text-xs">
+                              点击或拖拽上传
+                            </span>
+                            <span className="text-slate-400 text-[10px] mt-1 px-4 leading-tight">支持 JPG, PNG, WebP，最大 20MB</span>
+                            <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'villa')} />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Step 2: Product Sample block */}
+                    <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200/50 shadow-sm flex flex-col justify-between space-y-3">
+                      <div className="flex items-center space-x-2 text-slate-800 font-bold border-b border-slate-50 pb-2.5">
+                        <ImageIcon size={16} className="text-blue-600 shrink-0" />
+                        <span className="text-xs md:text-sm">
+                          步骤 2: 上传您的产品图
+                        </span>
+                      </div>
+                      <div className="relative aspect-[4/3] bg-slate-50 border-2 border-dashed border-slate-200/60 rounded-xl overflow-hidden group hover:border-blue-500 transition-colors flex-1 flex items-center justify-center">
+                        {productImage ? (
+                          <>
+                            <img src={productImage} className="w-full h-full object-cover" alt="Product" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <label className="cursor-pointer bg-white text-slate-950 px-4 py-2 rounded-full text-xs font-bold shadow-lg leading-none">
+                                重新上传
+                                <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'product')} />
+                              </label>
+                            </div>
+                          </>
+                        ) : (
+                          <label className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center p-4 text-center">
+                            <Upload className="mb-2 text-slate-400 group-hover:text-blue-500 transition-colors" size={30} />
+                            <span className="text-slate-900 font-bold text-xs font-black">
+                              点击或拖拽上传
+                            </span>
+                            <span className="text-slate-400 text-[10px] mt-1 px-4 leading-tight">支持 JPG, PNG, WebP，最大 20MB</span>
+                            <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'product')} />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* angle === 'detail' -> Single Step 2 block, beautifully centered and not stretched */
+                  <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200/50 shadow-sm space-y-3 max-w-xl mx-auto w-full">
+                    <div className="flex items-center space-x-2 text-slate-800 font-bold border-b border-slate-50 pb-2.5">
+                      <ImageIcon size={16} className="text-blue-600 shrink-0" />
+                      <span className="text-xs md:text-sm">
+                        上传您的产品图 (细节质感)
+                      </span>
+                    </div>
+                    <div className="relative aspect-video bg-slate-50 border-2 border-dashed border-slate-200/60 rounded-xl overflow-hidden group hover:border-blue-500 transition-colors">
+                      {productImage ? (
+                        <>
+                          <img src={productImage} className="w-full h-full object-cover" alt="Product" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <label className="cursor-pointer bg-white text-slate-950 px-4 py-2 rounded-full text-xs font-bold shadow-lg leading-none">
+                              重新上传
+                              <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'product')} />
+                            </label>
+                          </div>
+                        </>
+                      ) : (
+                        <label className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center p-4 text-center">
+                          <Upload className="mb-2 text-slate-400 group-hover:text-blue-500 transition-colors" size={30} />
+                          <span className="text-slate-900 font-bold text-xs font-black">
+                            点击或拖拽上传
+                          </span>
+                          <span className="text-slate-400 text-[10px] mt-1 px-4 leading-tight">支持 JPG, PNG, WebP，最大 20MB</span>
+                          <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'product')} />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Column 3: Right Sidebar Pane (Configuration Parameters & Generate Button) */}
+              <div className="lg:col-span-4 space-y-4">
+                {/* Generation Configuration & Generate Button */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <div className="flex items-center space-x-2 text-slate-900 font-bold">
+                      <Settings2 size={16} className="text-blue-600 shrink-0" />
+                      <span className="text-xs font-black">配置中心 / 设置参数</span>
                     </div>
                   </div>
 
-                  {/* Generation Configuration */}
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                      <div className="flex items-center space-x-2 text-slate-900 font-bold">
-                        <Settings2 size={20} className="text-blue-600" />
-                        <span>生成配置</span>
+                  <div className="space-y-5">
+                    <div className="space-y-3">
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">画面分辨率</label>
+                      <div className="flex space-x-1 p-1 bg-slate-50 rounded-xl">
+                        {['1k', '2k', '4k'].map((res) => (
+                          <button
+                            key={res}
+                            onClick={() => setResolution(res)}
+                            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-black transition-all ${
+                              resolution === res 
+                                ? 'bg-slate-900 text-white shadow-md' 
+                                : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                          >
+                            <span translate="no" className="notranslate">{res.toUpperCase()}</span>
+                          </button>
+                        ))}
                       </div>
                     </div>
 
-                    <div className="space-y-6">
-                      <div className="space-y-4">
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">图片质量</label>
-                        <div className="flex space-x-1">
-                          {['1k', '2k', '4k'].map((res) => (
-                            <button
-                              key={res}
-                              onClick={() => setResolution(res)}
-                              className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${
-                                resolution === res ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'
-                              }`}
-                            >
-                              {res.toUpperCase()}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">画面比例</label>
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-                          {['1:1', '3:4', '4:3', '16:9'].map((r) => (
-                            <button
-                              key={r}
-                              onClick={() => setRatio(r)}
-                              className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${
-                                ratio === r ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'
-                              }`}
-                            >
-                              {r}
-                            </button>
-                          ))}
-                        </div>
+                    <div className="space-y-3">
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">画面比例</label>
+                      <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1 rounded-xl">
+                        {['1:1', '3:4', '4:3', '16:9'].map((r) => (
+                          <button
+                            key={r}
+                            onClick={() => setRatio(r)}
+                            className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all text-center ${
+                              ratio === r 
+                                ? 'bg-slate-900 text-white shadow-md' 
+                                : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                          >
+                            {r}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </div>
 
-                  {/* Generate Button Integrated */}
+                  {/* Generate Button */}
                   <div className="pt-2">
                     <button
                       disabled={isGenerating || !productImage || (angle !== 'detail' && !villaImage)}
                       onClick={generateImage}
-                      className="w-full py-5 bg-blue-600 text-white rounded-2xl font-bold flex flex-col items-center justify-center space-y-1 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 active:scale-95"
+                      className="w-full py-4.5 bg-blue-600 hover:bg-blue-700 text-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed rounded-xl font-bold flex flex-col items-center justify-center space-y-0.5 transition-all shadow-xl shadow-blue-100 active:scale-[0.98]"
                     >
                       {isGenerating ? (
                         <>
-                          <RefreshCw className="animate-spin" size={24} />
-                          <span className="text-sm">正在重绘场景...</span>
+                          <RefreshCw className="animate-spin" size={20} />
+                          <span className="text-xs">正在重绘场景...</span>
                         </>
                       ) : (
                         <>
-                          <RefreshCw size={24} />
-                          <span className="text-sm">立即生成设计方案</span>
+                          <RefreshCw size={20} />
+                          <span className="text-xs">立即生成设计方案</span>
                         </>
                       )}
                     </button>
                   </div>
+                </div>
+              </div>
 
-                  {/* History Section Integrated */}
-                  <div className="space-y-6 pt-4">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                      <h3 className="text-sm font-bold text-slate-900 flex items-center">
-                        <History size={16} className="mr-2 text-blue-600" />
-                        历史记录
-                      </h3>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{history.length} ITEMS</span>
+            {/* History Section directly underneath at full width spanning 12 columns */}
+            <div className="lg:col-span-12 mt-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center">
+                  <History size={16} className="mr-2 text-blue-600" />
+                  生成历史
+                </h3>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest bg-slate-100 px-2.5 py-0.5 rounded-full">{history.length}</span>
+              </div>
+              {history.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+                  {history.slice(0, 16).map((item) => (
+                    <div key={item.id} className="group relative aspect-square bg-slate-100 rounded-xl overflow-hidden border border-slate-200 cursor-pointer shadow-sm hover:shadow-md transition-all">
+                      <img src={item.url} className="w-full h-full object-cover" alt="History" />
+                      <div className="absolute inset-0 bg-slate-900/65 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2 text-center text-white">
+                        <button 
+                          onClick={() => setPreviewImage(item)}
+                          className="bg-white text-slate-900 hover:bg-slate-100 px-2 py-1 rounded text-[10px] font-bold w-full uppercase shadow text-center"
+                        >
+                          预览
+                        </button>
+                      </div>
                     </div>
-                    {history.length > 0 ? (
-                      <div className="grid grid-cols-4 gap-3">
-                        {history.slice(0, 4).map((item) => (
-                          <div key={item.id} className="group relative aspect-square bg-slate-100 rounded-xl overflow-hidden border border-slate-200 cursor-pointer shadow-sm hover:shadow-md transition-all">
-                            <img src={item.url} className="w-full h-full object-cover" alt="History" />
-                            <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center space-y-1.5 p-2 text-center text-white">
-                              <button 
-                                onClick={() => setPreviewImage(item)}
-                                className="bg-white/20 hover:bg-white/30 backdrop-blur px-2 py-1 rounded text-[10px] font-bold w-full uppercase"
-                              >
-                                预览
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="py-8 bg-slate-50 border border-dashed border-slate-200 rounded-2xl flex items-center justify-center text-center text-slate-400 text-xs">
-                        暂无历史生成记录
-                      </div>
-                    )}
-                  </div>
+                  ))}
                 </div>
-              </div>
-            </div>
-
-            {/* Product Sample block (Left, Row 2) */}
-            <div className="lg:col-span-5">
-              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4 h-full">
-                <div className="flex items-center space-x-2 text-slate-900 font-bold border-b border-slate-100 pb-4">
-                  <ImageIcon size={20} className="text-blue-600" />
-                  <span>
-                    {angle === 'default' && "系统窗产品样图 (外观样式)"}
-                    {angle === 'interior' && "系统窗产品样图 (室内样式)"}
-                    {angle === 'high' && "系统窗产品样图 (俯瞰样式)"}
-                    {angle === 'detail' && "系统窗产品样图 (细节质感)"}
-                  </span>
+              ) : (
+                <div className="py-8 bg-slate-50 border border-dashed border-slate-200 rounded-2xl flex items-center justify-center text-center text-slate-400 text-sm">
+                  暂无历史生成记录
                 </div>
-                <div className="relative aspect-video bg-white border-2 border-dashed border-slate-200 rounded-3xl overflow-hidden group hover:border-blue-400 transition-colors">
-                  {productImage ? (
-                    <>
-                      <img src={productImage} className="w-full h-full object-cover" alt="Product" />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <label className="cursor-pointer bg-white text-slate-900 px-4 py-2 rounded-full text-sm font-bold shadow-lg leading-none">
-                          重新上传
-                          <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'product')} />
-                        </label>
-                      </div>
-                    </>
-                  ) : (
-                    <label className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center p-6 text-center">
-                      <Upload className="mb-4 text-slate-400 group-hover:text-blue-500 transition-colors" size={48} />
-                      <span className="text-slate-900 font-bold">
-                        {angle === 'default' && "点击上传外观样式图"}
-                        {angle === 'interior' && "点击上传室内样式图"}
-                        {angle === 'high' && "点击上传俯瞰样式图"}
-                        {angle === 'detail' && "点击上传产品细节图"}
-                      </span>
-                      <span className="text-slate-400 text-[10px] mt-2 px-4 leading-tight">支持 JPG, PNG, WebP，最大 20MB</span>
-                      <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'product')} />
-                    </label>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Info Card (Left, Row 3) */}
-            <div className="lg:col-span-5 mb-0">
-              <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 h-full">
-                <h4 className="text-blue-900 font-bold mb-2 flex items-center">
-                  <CheckCircle2 size={16} className="mr-2" />
-                  操作指南
-                </h4>
-                <ul className="text-sm text-blue-800/80 space-y-2">
-                  {angle !== 'detail' ? (
-                    <>
-                      <li>1. 上传您需要装修的别墅原始照片</li>
-                      <li>2. 上传您心仪的系统窗产品大样图</li>
-                      <li>3. AI将精准替换并统一视觉风格</li>
-                    </>
-                  ) : (
-                    <>
-                      <li>1. 上传系统窗产品高清图</li>
-                      <li>2. AI将生成局部微距特写，展示材质与工艺细节</li>
-                      <li>3. 支持4K超清渲染输出</li>
-                    </>
-                  )}
-                </ul>
-              </div>
+              )}
             </div>
           </motion.div>
         </AnimatePresence>
+        </div>
       </main>
 
       {/* Full-Screen Preview Modal */}
