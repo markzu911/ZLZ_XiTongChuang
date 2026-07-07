@@ -60,6 +60,44 @@ async function startServer() {
   app.post("/api/upload/direct-token", (req, res) => proxyRequest(req, res, "/api/upload/direct-token"));
   app.post("/api/upload/commit", (req, res) => proxyRequest(req, res, "/api/upload/commit"));
 
+  // Real Image Analysis Route
+  app.post("/api/analyze-image", async (req, res) => {
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) return res.status(500).json({ error: "GEMINI_API_KEY not configured" });
+
+      const { image, type } = req.body; // base64 image data
+      if (!image) return res.status(400).json({ error: "No image provided" });
+
+      const ai = new GoogleGenAI({ apiKey });
+      
+      const prompt = type === 'villa' 
+        ? "作为一个建筑设计专家，请简要分析这张场景图的建筑风格、光影特征和空间构图（30字以内）。"
+        : "作为一个工业设计专家，请简要分析这张产品的型材结构、材质特征和工艺细节（30字以内）。";
+
+      const [mimePart, base64Part] = image.split('base64,');
+      const mimeType = mimePart.split(':')[1].split(';')[0];
+
+      const result = await ai.models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: [
+          { text: prompt },
+          {
+            inlineData: {
+              data: base64Part,
+              mimeType: mimeType
+            }
+          }
+        ]
+      });
+
+      res.json({ analysis: result.text });
+    } catch (error: any) {
+      console.error("Analysis error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Generic Gemini API Proxy Route
   app.post("/api/gemini", async (req, res) => {
     try {

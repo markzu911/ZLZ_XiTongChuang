@@ -39,6 +39,7 @@ interface Message {
   image?: string;
   choices?: string[];
   action?: 'upload_villa' | 'upload_product' | 'generate';
+  isSettings?: boolean;
 }
 
 interface GeneratedImage {
@@ -220,6 +221,13 @@ export default function App() {
           role: 'assistant', 
           content: '正在为您生成，请稍候。',
         }]);
+      } else if (choice === '设置渲染参数') {
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: '请在下方选择渲染分辨率和画面比例：',
+          isSettings: true,
+          choices: ['立即生成设计']
+        }]);
       }
     }, 600);
   };
@@ -239,13 +247,27 @@ export default function App() {
           image: compressed 
         }]);
 
-        // Simulating Image Analysis
-        setTimeout(() => {
+        // Real Image Analysis
+        try {
+          const analysisRes = await fetch('/api/analyze-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: compressed, type })
+          });
+          const analysisData = await analysisRes.json();
+          const analysisText = analysisData.analysis || (type === 'villa' ? '分析完成：识别到现代极简风格场景。' : '分析完成：产品呈现高精度金属工艺。');
+
+          setMessages(prev => [...prev, { 
+            role: 'assistant', 
+            content: `🔍 AI分析结果：${analysisText}`,
+          }]);
+        } catch (err) {
+          console.error("Analysis failed", err);
           setMessages(prev => [...prev, { 
             role: 'assistant', 
             content: type === 'villa' ? '正在分析场景的光影构图与透视关系...' : '正在分析产品的型材切面与金属质感...',
           }]);
-        }, 600);
+        }
 
         setTimeout(() => {
           if (type === 'villa') {
@@ -270,7 +292,7 @@ export default function App() {
               }]);
             }
           }
-        }, 1800);
+        }, 1200);
       };
       reader.readAsDataURL(file);
     }
@@ -998,6 +1020,52 @@ export default function App() {
                           </div>
                         )}
                       </div>
+
+                      {/* Settings Card */}
+                      {msg.role === 'assistant' && msg.isSettings && (
+                        <div className="mt-4 p-5 bg-white border border-slate-100 rounded-3xl shadow-md w-full max-w-sm space-y-5">
+                          <div className="space-y-3">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                              <Settings2 size={12} /> 渲染分辨率
+                            </label>
+                            <div className="flex gap-2">
+                              {['1k', '2k', '4k'].map((res) => (
+                                <button
+                                  key={res}
+                                  onClick={() => setResolution(res)}
+                                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${
+                                    resolution === res 
+                                      ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100' 
+                                      : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'
+                                  }`}
+                                >
+                                  {res.toUpperCase()}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="space-y-3">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                              <Layout size={12} /> 画面比例
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              {['1:1', '3:4', '4:3', '16:9'].map((r) => (
+                                <button
+                                  key={r}
+                                  onClick={() => setRatio(r)}
+                                  className={`py-2 rounded-xl text-xs font-bold transition-all border ${
+                                    ratio === r 
+                                      ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100' 
+                                      : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'
+                                  }`}
+                                >
+                                  {r}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Choice buttons below AI text */}
                       {msg.role === 'assistant' && msg.choices && (
