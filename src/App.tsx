@@ -23,12 +23,23 @@ import {
   XCircle,
   Settings2,
   User,
-  Coins
+  Coins,
+  MessageSquare,
+  Sparkles,
+  Send
 } from 'lucide-react';
 
 // --- Types ---
 
 type ViewAngle = 'default' | 'interior' | 'high' | 'detail';
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+  image?: string;
+  choices?: string[];
+  action?: 'upload_villa' | 'upload_product' | 'generate';
+}
 
 interface GeneratedImage {
   id: string;
@@ -44,6 +55,7 @@ interface GeneratedImage {
 
 export default function App() {
   const [step, setStep] = useState(2);
+  const [mainView, setMainView] = useState<'editor' | 'agent'>('editor');
   const [angle, setAngle] = useState<ViewAngle>('default');
   const [villaImage, setVillaImage] = useState<string | null>(null);
   const [productImage, setProductImage] = useState<string | null>(null);
@@ -148,6 +160,121 @@ export default function App() {
   // Settings
   const [resolution, setResolution] = useState('2k'); // 1k, 2k, 4k
   const [ratio, setRatio] = useState('1:1'); // 1:1, 3:4, 4:3, 16:9
+
+  // --- Agent States ---
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      role: 'assistant',
+      content: '您好！我是您的设计助手。请先选择您想要重塑的场景类型：',
+      choices: ['室外默认场景', '室内场景', '高空俯拍视角', '产品局部细节'],
+    }
+  ]);
+
+  const handleAgentChoice = (choice: string) => {
+    setMessages(prev => [...prev, { role: 'user', content: choice }]);
+    
+    setTimeout(() => {
+      // Handle Scene Selection
+      if (['室外默认场景', '室内场景', '高空俯拍视角', '产品局部细节'].includes(choice)) {
+        let selectedAngle: ViewAngle = 'default';
+        if (choice === '室内场景') selectedAngle = 'interior';
+        if (choice === '高空俯拍视角') selectedAngle = 'high';
+        if (choice === '产品局部细节') selectedAngle = 'detail';
+        
+        setAngle(selectedAngle);
+        setVillaImage(null);
+        setProductImage(null);
+        setResultImage(null);
+
+        if (selectedAngle === 'detail') {
+          setMessages(prev => [...prev, { 
+            role: 'assistant', 
+            content: `已切换至【${choice}】。该模式仅需上传产品细节图。`,
+            choices: ['上传产品图片']
+          }]);
+        } else {
+          setMessages(prev => [...prev, { 
+            role: 'assistant', 
+            content: `已切换至【${choice}】。建议先上传场景底图作为构图参考。`,
+            choices: ['上传场景图片', '上传产品图片']
+          }]);
+        }
+        return;
+      }
+
+      if (choice === '上传场景图片') {
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: '请上传您的场景照片，我将为您分析。',
+          action: 'upload_villa'
+        }]);
+      } else if (choice === '上传产品图片') {
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: '请上传系统窗产品图。',
+          action: 'upload_product'
+        }]);
+      } else if (choice === '立即生成设计') {
+        generateImage();
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: '正在为您生成，请稍候。',
+        }]);
+      }
+    }, 600);
+  };
+
+  const handleAgentUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'villa' | 'product') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const compressed = await compressImage(reader.result as string);
+        if (type === 'villa') setVillaImage(compressed);
+        else setProductImage(compressed);
+        
+        setMessages(prev => [...prev, { 
+          role: 'user', 
+          content: type === 'villa' ? '已上传场景图' : '已上传产品图',
+          image: compressed 
+        }]);
+
+        // Simulating Image Analysis
+        setTimeout(() => {
+          setMessages(prev => [...prev, { 
+            role: 'assistant', 
+            content: type === 'villa' ? '正在分析场景的光影构图与透视关系...' : '正在分析产品的型材切面与金属质感...',
+          }]);
+        }, 600);
+
+        setTimeout(() => {
+          if (type === 'villa') {
+             setMessages(prev => [...prev, { 
+              role: 'assistant', 
+              content: '场景分析完成。建议下一步上传产品图。',
+              choices: ['上传产品图片']
+            }]);
+          } else {
+            // If in detail mode, we don't need villa image
+            if (angle === 'detail' || villaImage) {
+               setMessages(prev => [...prev, { 
+                role: 'assistant', 
+                content: '素材已齐备。您可以设置渲染参数（如：4k, 16:9）或直接出图。',
+                choices: ['立即生成设计', '设置渲染参数']
+              }]);
+            } else {
+               setMessages(prev => [...prev, { 
+                role: 'assistant', 
+                content: '产品图分析完成。建议补充上传场景图以获得更佳融合效果。',
+                choices: ['上传场景图片']
+              }]);
+            }
+          }
+        }, 1800);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const compressImage = (dataUrl: string, maxWidth = 1600, quality = 0.85): Promise<string> => {
     return new Promise((resolve) => {
@@ -411,61 +538,100 @@ export default function App() {
           </div>
 
           {/* Navigation Menu Header */}
-          <div className="space-y-2">
-            {!isSidebarCollapsed && (
-              <div className="px-1 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center md:text-left">
-                导航菜单
+          <div className="space-y-4">
+            <div className="space-y-1">
+              {!isSidebarCollapsed && (
+                <div className="px-1 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center md:text-left mb-2">
+                  核心功能
+                </div>
+              )}
+              <button
+                onClick={() => setMainView('agent')}
+                className={`w-full transition-all duration-200 group flex items-center ${
+                  isSidebarCollapsed ? 'justify-center p-2.5' : 'p-3 space-x-3'
+                } rounded-xl ${
+                  mainView === 'agent' 
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-100' 
+                    : 'bg-transparent text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <Sparkles size={18} className={mainView === 'agent' ? 'text-white' : 'text-blue-500'} />
+                {!isSidebarCollapsed && <span className="text-sm font-bold">智能体生成</span>}
+              </button>
+              
+              <button
+                onClick={() => setMainView('editor')}
+                className={`w-full transition-all duration-200 group flex items-center ${
+                  isSidebarCollapsed ? 'justify-center p-2.5' : 'p-3 space-x-3'
+                } rounded-xl ${
+                  mainView === 'editor' 
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-100' 
+                    : 'bg-transparent text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <Layout size={18} className={mainView === 'editor' ? 'text-white' : 'text-slate-400'} />
+                {!isSidebarCollapsed && <span className="text-sm font-bold">编辑器</span>}
+              </button>
+            </div>
+
+            {mainView === 'editor' && (
+              <div className="space-y-2 pt-2 border-t border-slate-50">
+                {!isSidebarCollapsed && (
+                  <div className="px-1 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center md:text-left">
+                    编辑器场景
+                  </div>
+                )}
+                
+                {/* View selectors styled as navigation tabs */}
+                <div className="flex flex-col space-y-1">
+                  {[
+                    { id: 'default', label: '室外默认场景', sub: '替换原有建筑面窗户', icon: <Layout size={16} /> },
+                    { id: 'interior', label: '室内场景', sub: '阳光房与室内全景重塑', icon: <Home size={16} /> },
+                    { id: 'high', label: '高空俯拍视角', sub: '无人机高视角融合', icon: <Maximize size={16} /> },
+                    { id: 'detail', label: '产品局部细节', sub: '型材剖面与特写超分', icon: <Box size={16} /> },
+                  ].map((v) => {
+                    const isActive = angle === v.id;
+                    return (
+                      <button
+                        key={v.id}
+                        title={v.label}
+                        onClick={() => {
+                          setAngle(v.id as ViewAngle);
+                          setVillaImage(null);
+                          setProductImage(null);
+                          setResultImage(null);
+                        }}
+                        className={`w-full transition-all duration-200 group flex ${
+                          isSidebarCollapsed 
+                            ? 'items-center justify-center p-2.5 rounded-lg' 
+                            : 'flex-col space-y-0.5 p-2.5 rounded-xl text-center md:text-left'
+                        } ${
+                          isActive 
+                            ? 'bg-[#f4f7f6] text-blue-600 border border-slate-100 shadow-sm' 
+                            : 'bg-transparent text-slate-500 hover:text-slate-850 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2 w-full justify-center md:justify-start">
+                          <span className={`${isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
+                            {v.icon}
+                          </span>
+                          {!isSidebarCollapsed && (
+                            <span className={`text-xs font-bold leading-none ${isActive ? 'text-blue-650 font-black' : 'text-slate-700'}`}>
+                              {v.label}
+                            </span>
+                          )}
+                        </div>
+                        {!isSidebarCollapsed && (
+                          <span className="text-[9px] text-slate-400 font-medium pl-0 md:pl-6 block truncate w-full text-center md:text-left mt-0.5 md:mt-0">
+                            {v.sub}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
-            
-            {/* View selectors styled as navigation tabs */}
-            <div className="flex flex-col space-y-1">
-              {[
-                { id: 'default', label: '室外默认场景', sub: '替换原有建筑面窗户', icon: <Layout size={16} /> },
-                { id: 'interior', label: '室内场景', sub: '阳光房与室内全景重塑', icon: <Home size={16} /> },
-                { id: 'high', label: '高空俯拍视角', sub: '无人机高视角融合', icon: <Maximize size={16} /> },
-                { id: 'detail', label: '产品局部细节', sub: '型材剖面与特写超分', icon: <Box size={16} /> },
-              ].map((v) => {
-                const isActive = angle === v.id;
-                return (
-                  <button
-                    key={v.id}
-                    title={v.label}
-                    onClick={() => {
-                      setAngle(v.id as ViewAngle);
-                      setVillaImage(null);
-                      setProductImage(null);
-                      setResultImage(null);
-                    }}
-                    className={`w-full transition-all duration-200 group flex ${
-                      isSidebarCollapsed 
-                        ? 'items-center justify-center p-2.5 rounded-lg' 
-                        : 'flex-col space-y-0.5 p-2.5 rounded-xl text-center md:text-left'
-                    } ${
-                      isActive 
-                        ? 'bg-[#f4f7f6] text-blue-600 border border-slate-100 shadow-sm' 
-                        : 'bg-transparent text-slate-500 hover:text-slate-850 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-2 w-full justify-center md:justify-start">
-                      <span className={`${isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
-                        {v.icon}
-                      </span>
-                      {!isSidebarCollapsed && (
-                        <span className={`text-xs font-bold leading-none ${isActive ? 'text-blue-650 font-black' : 'text-slate-700'}`}>
-                          {v.label}
-                        </span>
-                      )}
-                    </div>
-                    {!isSidebarCollapsed && (
-                      <span className="text-[9px] text-slate-400 font-medium pl-0 md:pl-6 block truncate w-full text-center md:text-left mt-0.5 md:mt-0">
-                        {v.sub}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
           </div>
 
           {/* Info Card block (Operation Guide) */}
@@ -548,240 +714,438 @@ export default function App() {
       </aside>
 
       {/* Main Workspace content */}
-      <main className="flex-1 overflow-y-auto px-6 py-10 lg:px-12">
-        <div className="max-w-[1300px] mx-auto w-full">
-          {/* Workspace Header */}
-          <div className="mb-8 space-y-2">
-            <h2 className="text-3xl font-black tracking-tight text-slate-900">
-              {angle === 'default' && "构图分析与产品无缝融合替换"}
-              {angle === 'interior' && "风格直接融合生成"}
-              {angle === 'high' && "模拟俯拍与产品融合"}
-              {angle === 'detail' && "型材剖面与产品局部细节重绘"}
-            </h2>
-            <p className="text-sm text-slate-500 max-w-3xl leading-relaxed">
-              {angle === 'detail' 
-                ? "上传系统窗或型材切面特写大图，自动极佳生成局部纹理特写。无需上传别墅场景图。" 
-                : "上传一张参考构图图片，自动识别要保留的背景与环境元素，并把您的新产品无缝替换融合进去。"}
-            </p>
-          </div>
+      {/* Main Workspace content */}
+      <main className="flex-1 overflow-y-auto px-6 py-10 lg:px-12 flex flex-col items-center">
+        <div className="max-w-[1300px] mx-auto w-full flex-1 flex flex-col">
+          {mainView === 'editor' ? (
+            <>
+              {/* Workspace Header */}
+              <div className="mb-8 space-y-2">
+                <h2 className="text-3xl font-black tracking-tight text-slate-900">
+                  {angle === 'default' && "构图分析与产品无缝融合替换"}
+                  {angle === 'interior' && "风格直接融合生成"}
+                  {angle === 'high' && "模拟俯拍与产品融合"}
+                  {angle === 'detail' && "型材剖面与产品局部细节重绘"}
+                </h2>
+                <p className="text-sm text-slate-500 max-w-3xl leading-relaxed">
+                  {angle === 'detail' 
+                    ? "上传系统窗或型材切面特写大图，自动极佳生成局部纹理特写。无需上传别墅场景图。" 
+                    : "上传一张参考构图图片，自动识别要保留的背景与环境元素，并把您的新产品无缝替换融合进去。"}
+                </p>
+              </div>
 
-          <AnimatePresence mode="wait">
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 lg:grid-cols-12 gap-x-8 gap-y-6 items-stretch w-full"
-            >
-              {/* Column 2: Middle Pane (Upload original scene and product sample in a compact side-by-side layout) */}
-              <div className={`lg:col-span-8 flex flex-col justify-start gap-4 ${angle === 'detail' ? 'max-w-xl mx-auto w-full' : ''}`}>
-                {angle !== 'detail' ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch w-full">
-                    {/* Step 1: Villa Scene block */}
-                    <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200/50 shadow-sm flex flex-col justify-between space-y-3">
-                      <div className="flex items-center space-x-2 text-slate-800 font-bold border-b border-slate-50 pb-2.5">
-                        <Camera size={16} className="text-blue-600 shrink-0" />
-                        <span className="text-xs md:text-sm">
-                          步骤 1: 上传场景图 (环境光影参考)
-                        </span>
-                      </div>
-                      <div className="relative aspect-[4/3] bg-slate-50 border-2 border-dashed border-slate-200/60 rounded-xl overflow-hidden group hover:border-blue-500 transition-colors flex-1 flex items-center justify-center">
-                        {villaImage ? (
-                          <>
-                            <img src={villaImage} className="w-full h-full object-cover" alt="Villa" />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <label className="cursor-pointer bg-white text-slate-950 px-4 py-2 rounded-full text-xs font-bold shadow-lg leading-none">
-                                重新上传
+              <AnimatePresence mode="wait">
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="grid grid-cols-1 lg:grid-cols-12 gap-x-8 gap-y-6 items-stretch w-full"
+                >
+                  {/* Column 2: Middle Pane (Upload original scene and product sample in a compact side-by-side layout) */}
+                  <div className={`lg:col-span-8 flex flex-col justify-start gap-4 ${angle === 'detail' ? 'max-w-xl mx-auto w-full' : ''}`}>
+                    {angle !== 'detail' ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch w-full">
+                        {/* Step 1: Villa Scene block */}
+                        <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200/50 shadow-sm flex flex-col justify-between space-y-3">
+                          <div className="flex items-center space-x-2 text-slate-800 font-bold border-b border-slate-50 pb-2.5">
+                            <Camera size={16} className="text-blue-600 shrink-0" />
+                            <span className="text-xs md:text-sm">
+                              步骤 1: 上传场景图 (环境光影参考)
+                            </span>
+                          </div>
+                          <div className="relative aspect-[4/3] bg-slate-50 border-2 border-dashed border-slate-200/60 rounded-xl overflow-hidden group hover:border-blue-500 transition-colors flex-1 flex items-center justify-center">
+                            {villaImage ? (
+                              <>
+                                <img src={villaImage} className="w-full h-full object-cover" alt="Villa" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <label className="cursor-pointer bg-white text-slate-950 px-4 py-2 rounded-full text-xs font-bold shadow-lg leading-none">
+                                    重新上传
+                                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'villa')} />
+                                  </label>
+                                </div>
+                              </>
+                            ) : (
+                              <label className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center p-4 text-center">
+                                <Upload className="mb-2 text-slate-400 group-hover:text-blue-500 transition-colors" size={30} />
+                                <span className="text-slate-900 font-bold text-xs">
+                                  点击或拖拽上传
+                                </span>
+                                <span className="text-slate-400 text-[10px] mt-1 px-4 leading-tight">支持 JPG, PNG, WebP，最大 20MB</span>
                                 <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'villa')} />
                               </label>
-                            </div>
-                          </>
-                        ) : (
-                          <label className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center p-4 text-center">
-                            <Upload className="mb-2 text-slate-400 group-hover:text-blue-500 transition-colors" size={30} />
-                            <span className="text-slate-900 font-bold text-xs">
-                              点击或拖拽上传
-                            </span>
-                            <span className="text-slate-400 text-[10px] mt-1 px-4 leading-tight">支持 JPG, PNG, WebP，最大 20MB</span>
-                            <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'villa')} />
-                          </label>
-                        )}
-                      </div>
-                    </div>
+                            )}
+                          </div>
+                        </div>
 
-                    {/* Step 2: Product Sample block */}
-                    <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200/50 shadow-sm flex flex-col justify-between space-y-3">
-                      <div className="flex items-center space-x-2 text-slate-800 font-bold border-b border-slate-50 pb-2.5">
-                        <ImageIcon size={16} className="text-blue-600 shrink-0" />
-                        <span className="text-xs md:text-sm">
-                          步骤 2: 上传您的产品图
-                        </span>
-                      </div>
-                      <div className="relative aspect-[4/3] bg-slate-50 border-2 border-dashed border-slate-200/60 rounded-xl overflow-hidden group hover:border-blue-500 transition-colors flex-1 flex items-center justify-center">
-                        {productImage ? (
-                          <>
-                            <img src={productImage} className="w-full h-full object-cover" alt="Product" />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <label className="cursor-pointer bg-white text-slate-950 px-4 py-2 rounded-full text-xs font-bold shadow-lg leading-none">
-                                重新上传
+                        {/* Step 2: Product Sample block */}
+                        <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200/50 shadow-sm flex flex-col justify-between space-y-3">
+                          <div className="flex items-center space-x-2 text-slate-800 font-bold border-b border-slate-50 pb-2.5">
+                            <ImageIcon size={16} className="text-blue-600 shrink-0" />
+                            <span className="text-xs md:text-sm">
+                              步骤 2: 上传您的产品图
+                            </span>
+                          </div>
+                          <div className="relative aspect-[4/3] bg-slate-50 border-2 border-dashed border-slate-200/60 rounded-xl overflow-hidden group hover:border-blue-500 transition-colors flex-1 flex items-center justify-center">
+                            {productImage ? (
+                              <>
+                                <img src={productImage} className="w-full h-full object-cover" alt="Product" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <label className="cursor-pointer bg-white text-slate-950 px-4 py-2 rounded-full text-xs font-bold shadow-lg leading-none">
+                                    重新上传
+                                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'product')} />
+                                  </label>
+                                </div>
+                              </>
+                            ) : (
+                              <label className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center p-4 text-center">
+                                <ImageIcon className="mb-2 text-slate-400 group-hover:text-blue-500 transition-colors" size={30} />
+                                <span className="text-slate-900 font-bold text-xs font-black">
+                                  点击或拖拽上传
+                                </span>
+                                <span className="text-slate-400 text-[10px] mt-1 px-4 leading-tight">支持 JPG, PNG, WebP，最大 20MB</span>
                                 <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'product')} />
                               </label>
-                            </div>
-                          </>
-                        ) : (
-                          <label className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center p-4 text-center">
-                            <Upload className="mb-2 text-slate-400 group-hover:text-blue-500 transition-colors" size={30} />
-                            <span className="text-slate-900 font-bold text-xs font-black">
-                              点击或拖拽上传
-                            </span>
-                            <span className="text-slate-400 text-[10px] mt-1 px-4 leading-tight">支持 JPG, PNG, WebP，最大 20MB</span>
-                            <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'product')} />
-                          </label>
-                        )}
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ) : (
-                  /* angle === 'detail' -> Single Step 2 block, beautifully centered and not stretched */
-                  <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200/50 shadow-sm space-y-3 max-w-xl mx-auto w-full">
-                    <div className="flex items-center space-x-2 text-slate-800 font-bold border-b border-slate-50 pb-2.5">
-                      <ImageIcon size={16} className="text-blue-600 shrink-0" />
-                      <span className="text-xs md:text-sm">
-                        上传您的产品图 (细节质感)
-                      </span>
-                    </div>
-                    <div className="relative aspect-video bg-slate-50 border-2 border-dashed border-slate-200/60 rounded-xl overflow-hidden group hover:border-blue-500 transition-colors">
-                      {productImage ? (
-                        <>
-                          <img src={productImage} className="w-full h-full object-cover" alt="Product" />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <label className="cursor-pointer bg-white text-slate-950 px-4 py-2 rounded-full text-xs font-bold shadow-lg leading-none">
-                              重新上传
+                    ) : (
+                      /* angle === 'detail' -> Single Step 2 block, beautifully centered and not stretched */
+                      <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200/50 shadow-sm space-y-3 max-w-xl mx-auto w-full">
+                        <div className="flex items-center space-x-2 text-slate-800 font-bold border-b border-slate-50 pb-2.5">
+                          <ImageIcon size={16} className="text-blue-600 shrink-0" />
+                          <span className="text-xs md:text-sm">
+                            上传您的产品图 (细节质感)
+                          </span>
+                        </div>
+                        <div className="relative aspect-video bg-slate-50 border-2 border-dashed border-slate-200/60 rounded-xl overflow-hidden group hover:border-blue-500 transition-colors">
+                          {productImage ? (
+                            <>
+                              <img src={productImage} className="w-full h-full object-cover" alt="Product" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <label className="cursor-pointer bg-white text-slate-950 px-4 py-2 rounded-full text-xs font-bold shadow-lg leading-none">
+                                  重新上传
+                                  <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'product')} />
+                                </label>
+                              </div>
+                            </>
+                          ) : (
+                            <label className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center p-4 text-center">
+                              <Upload className="mb-2 text-slate-400 group-hover:text-blue-500 transition-colors" size={30} />
+                              <span className="text-slate-900 font-bold text-xs font-black">
+                                点击或拖拽上传
+                              </span>
+                              <span className="text-slate-400 text-[10px] mt-1 px-4 leading-tight">支持 JPG, PNG, WebP，最大 20MB</span>
                               <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'product')} />
                             </label>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Column 3: Right Sidebar Pane (Configuration Parameters & Generate Button) */}
+                  <div className="lg:col-span-4 space-y-4">
+                    {/* Generation Configuration & Generate Button */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                        <div className="flex items-center space-x-2 text-slate-900 font-bold">
+                          <Settings2 size={16} className="text-blue-600 shrink-0" />
+                          <span className="text-xs font-black">配置中心 / 设置参数</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-5">
+                        <div className="space-y-3">
+                          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">画面分辨率</label>
+                          <div className="flex space-x-1 p-1 bg-slate-50 rounded-xl">
+                            {['1k', '2k', '4k'].map((res) => (
+                              <button
+                                key={res}
+                                onClick={() => setResolution(res)}
+                                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-black transition-all ${
+                                  resolution === res 
+                                    ? 'bg-slate-900 text-white shadow-md' 
+                                    : 'text-slate-500 hover:text-slate-800'
+                                }`}
+                              >
+                                <span translate="no" className="notranslate">{res.toUpperCase()}</span>
+                              </button>
+                            ))}
                           </div>
-                        </>
-                      ) : (
-                        <label className="absolute inset-0 cursor-pointer flex flex-col items-center justify-center p-4 text-center">
-                          <Upload className="mb-2 text-slate-400 group-hover:text-blue-500 transition-colors" size={30} />
-                          <span className="text-slate-900 font-bold text-xs font-black">
-                            点击或拖拽上传
-                          </span>
-                          <span className="text-slate-400 text-[10px] mt-1 px-4 leading-tight">支持 JPG, PNG, WebP，最大 20MB</span>
-                          <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'product')} />
-                        </label>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
+                        </div>
 
-              {/* Column 3: Right Sidebar Pane (Configuration Parameters & Generate Button) */}
-              <div className="lg:col-span-4 space-y-4">
-                {/* Generation Configuration & Generate Button */}
-                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                    <div className="flex items-center space-x-2 text-slate-900 font-bold">
-                      <Settings2 size={16} className="text-blue-600 shrink-0" />
-                      <span className="text-xs font-black">配置中心 / 设置参数</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-5">
-                    <div className="space-y-3">
-                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">画面分辨率</label>
-                      <div className="flex space-x-1 p-1 bg-slate-50 rounded-xl">
-                        {['1k', '2k', '4k'].map((res) => (
-                          <button
-                            key={res}
-                            onClick={() => setResolution(res)}
-                            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-black transition-all ${
-                              resolution === res 
-                                ? 'bg-slate-900 text-white shadow-md' 
-                                : 'text-slate-500 hover:text-slate-800'
-                            }`}
-                          >
-                            <span translate="no" className="notranslate">{res.toUpperCase()}</span>
-                          </button>
-                        ))}
+                        <div className="space-y-3">
+                          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">画面比例</label>
+                          <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1 rounded-xl">
+                            {['1:1', '3:4', '4:3', '16:9'].map((r) => (
+                              <button
+                                key={r}
+                                onClick={() => setRatio(r)}
+                                className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all text-center ${
+                                  ratio === r 
+                                    ? 'bg-slate-900 text-white shadow-md' 
+                                    : 'text-slate-500 hover:text-slate-800'
+                                }`}
+                              >
+                                {r}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="space-y-3">
-                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">画面比例</label>
-                      <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1 rounded-xl">
-                        {['1:1', '3:4', '4:3', '16:9'].map((r) => (
-                          <button
-                            key={r}
-                            onClick={() => setRatio(r)}
-                            className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all text-center ${
-                              ratio === r 
-                                ? 'bg-slate-900 text-white shadow-md' 
-                                : 'text-slate-500 hover:text-slate-800'
-                            }`}
-                          >
-                            {r}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Generate Button */}
-                  <div className="pt-2">
-                    <button
-                      disabled={isGenerating || !productImage || (angle !== 'detail' && !villaImage)}
-                      onClick={generateImage}
-                      className="w-full py-4.5 bg-blue-600 hover:bg-blue-700 text-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed rounded-xl font-bold flex flex-col items-center justify-center space-y-0.5 transition-all shadow-xl shadow-blue-100 active:scale-[0.98]"
-                    >
-                      {isGenerating ? (
-                        <>
-                          <RefreshCw className="animate-spin" size={20} />
-                          <span className="text-xs">正在重绘场景...</span>
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw size={20} />
-                          <span className="text-xs">立即生成设计方案</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-            {/* History Section directly underneath at full width spanning 12 columns */}
-            <div className="lg:col-span-12 mt-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="text-sm font-bold text-slate-900 flex items-center">
-                  <History size={16} className="mr-2 text-blue-600" />
-                  生成历史
-                </h3>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest bg-slate-100 px-2.5 py-0.5 rounded-full">{history.length}</span>
-              </div>
-              {history.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-                  {history.slice(0, 16).map((item) => (
-                    <div key={item.id} className="group relative aspect-square bg-slate-100 rounded-xl overflow-hidden border border-slate-200 cursor-pointer shadow-sm hover:shadow-md transition-all">
-                      <img src={item.url} className="w-full h-full object-cover" alt="History" />
-                      <div className="absolute inset-0 bg-slate-900/65 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2 text-center text-white">
-                        <button 
-                          onClick={() => setPreviewImage(item)}
-                          className="bg-white text-slate-900 hover:bg-slate-100 px-2 py-1 rounded text-[10px] font-bold w-full uppercase shadow text-center"
+                      {/* Generate Button */}
+                      <div className="pt-2">
+                        <button
+                          disabled={isGenerating || !productImage || (angle !== 'detail' && !villaImage)}
+                          onClick={generateImage}
+                          className="w-full py-4.5 bg-blue-600 hover:bg-blue-700 text-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed rounded-xl font-bold flex flex-col items-center justify-center space-y-0.5 transition-all shadow-xl shadow-blue-100 active:scale-[0.98]"
                         >
-                          预览
+                          {isGenerating ? (
+                            <>
+                              <RefreshCw className="animate-spin" size={20} />
+                              <span className="text-xs">正在重绘场景...</span>
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw size={20} />
+                              <span className="text-xs">立即生成设计方案</span>
+                            </>
+                          )}
                         </button>
                       </div>
                     </div>
-                  ))}
+                  </div>
+
+                  {/* History Section directly underneath at full width spanning 12 columns */}
+                  <div className="lg:col-span-12 mt-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <h3 className="text-sm font-bold text-slate-900 flex items-center">
+                        <History size={16} className="mr-2 text-blue-600" />
+                        生成历史
+                      </h3>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest bg-slate-100 px-2.5 py-0.5 rounded-full">{history.length}</span>
+                    </div>
+                    {history.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+                        {history.slice(0, 16).map((item) => (
+                          <div key={item.id} className="group relative aspect-square bg-slate-100 rounded-xl overflow-hidden border border-slate-200 cursor-pointer shadow-sm hover:shadow-md transition-all">
+                            <img src={item.url} className="w-full h-full object-cover" alt="History" />
+                            <div className="absolute inset-0 bg-slate-900/65 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2 text-center text-white">
+                              <button 
+                                onClick={() => setPreviewImage(item)}
+                                className="bg-white text-slate-900 hover:bg-slate-100 px-2 py-1 rounded text-[10px] font-bold w-full uppercase shadow text-center"
+                              >
+                                预览
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-8 bg-slate-50 border border-dashed border-slate-200 rounded-2xl flex items-center justify-center text-center text-slate-400 text-sm">
+                        暂无历史生成记录
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col max-w-3xl mx-auto w-full h-[calc(100vh-160px)] bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden mt-4">
+              {/* Chat Header */}
+              <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-white sticky top-0 z-10">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-100">
+                    <Sparkles size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900 leading-none">智能设计助手</h3>
+                    <p className="text-[10px] text-slate-400 mt-1.5 font-black uppercase tracking-widest">Architectural AI Agent</p>
+                  </div>
                 </div>
-              ) : (
-                <div className="py-8 bg-slate-50 border border-dashed border-slate-200 rounded-2xl flex items-center justify-center text-center text-slate-400 text-sm">
-                  暂无历史生成记录
+                <div className="flex items-center gap-2">
+                  <div className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider ${villaImage ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}>
+                    场景: {villaImage ? 'READY' : 'EMPTY'}
+                  </div>
+                  <div className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider ${productImage ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}>
+                    产品: {productImage ? 'READY' : 'EMPTY'}
+                  </div>
                 </div>
-              )}
+              </div>
+
+              {/* Chat Messages */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-8 scroll-smooth bg-slate-50/30">
+                {messages.map((msg, idx) => (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    key={idx} 
+                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={`max-w-[85%] flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                      <div className={`p-4 rounded-3xl text-sm leading-relaxed ${
+                        msg.role === 'user' 
+                          ? 'bg-blue-600 text-white rounded-tr-none shadow-lg shadow-blue-100' 
+                          : 'bg-white text-slate-700 rounded-tl-none border border-slate-100 shadow-sm font-medium'
+                      }`}>
+                        {msg.content}
+                        
+                        {msg.image && (
+                          <div className="mt-3 rounded-2xl overflow-hidden border border-white/20 shadow-inner">
+                            <img src={msg.image} className="w-full max-h-64 object-cover" alt="Uploaded" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Choice buttons below AI text */}
+                      {msg.role === 'assistant' && msg.choices && (
+                        <div className="flex flex-wrap gap-2 mt-4">
+                          {msg.choices.map((choice) => (
+                            <button
+                              key={choice}
+                              onClick={() => handleAgentChoice(choice)}
+                              className="px-5 py-2.5 bg-white border border-slate-200 rounded-full text-[11px] font-black text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition-all shadow-sm uppercase tracking-wider active:scale-95"
+                            >
+                              {choice}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Upload triggers */}
+                      {msg.role === 'assistant' && msg.action && (
+                        <label className="mt-4 flex items-center justify-center w-full p-6 bg-white border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all group shadow-sm">
+                          <div className="flex flex-col items-center space-y-2">
+                            <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+                              <Upload size={18} />
+                            </div>
+                            <span className="text-xs font-black text-slate-500 uppercase tracking-widest group-hover:text-blue-600">点击上传素材图片</span>
+                          </div>
+                          <input 
+                            type="file" 
+                            className="hidden" 
+                            accept="image/*" 
+                            onChange={(e) => handleAgentUpload(e, msg.action === 'upload_villa' ? 'villa' : 'product')} 
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+
+                {isGenerating && (
+                   <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex justify-start"
+                   >
+                     <div className="bg-white p-4 rounded-3xl rounded-tl-none border border-slate-100 flex items-center space-x-3 shadow-sm">
+                       <Loader2 size={16} className="text-blue-600 animate-spin" />
+                       <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Designing...</span>
+                     </div>
+                   </motion.div>
+                )}
+
+                {resultImage && mainView === 'agent' && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex flex-col items-center space-y-6 pt-6"
+                  >
+                    <div className="w-full rounded-3xl overflow-hidden border border-slate-200 shadow-2xl relative group bg-white p-2">
+                      <img src={resultImage} className="w-full rounded-2xl object-contain" alt="Final Result" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl m-2">
+                        <button className="bg-white text-slate-900 p-4 rounded-full shadow-2xl hover:scale-110 transition-transform">
+                          <Download size={24} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="bg-blue-600 text-white px-6 py-2.5 rounded-full text-xs font-black border border-blue-400 flex items-center space-x-3 shadow-lg shadow-blue-100">
+                       <CheckCircle2 size={16} />
+                       <span className="uppercase tracking-widest">设计方案已就绪</span>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+
+              {/* Chat Input Bar */}
+              <div className="p-6 bg-white border-t border-slate-50">
+                <div className="flex items-center space-x-3 bg-slate-50 rounded-2xl px-5 py-3 focus-within:ring-4 focus-within:ring-blue-100/50 transition-all border border-slate-100">
+                  <input 
+                    type="text" 
+                    placeholder="输入您的设计需求或直接提问..."
+                    className="flex-1 bg-transparent border-none focus:outline-none text-sm py-1.5 text-slate-700 placeholder:text-slate-400 font-medium"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                        const val = e.currentTarget.value.trim();
+                        setMessages(prev => [...prev, { role: 'user', content: val }]);
+                        e.currentTarget.value = '';
+
+                        // Parsing parameters from chat
+                        const lowerVal = val.toLowerCase();
+                        let foundParam = false;
+                        let newRes = resolution;
+                        let newRatio = ratio;
+                        
+                        if (lowerVal.includes('1k')) { setResolution('1k'); newRes = '1k'; foundParam = true; }
+                        else if (lowerVal.includes('2k')) { setResolution('2k'); newRes = '2k'; foundParam = true; }
+                        else if (lowerVal.includes('4k')) { setResolution('4k'); newRes = '4k'; foundParam = true; }
+
+                        if (lowerVal.includes('1:1')) { setRatio('1:1'); newRatio = '1:1'; foundParam = true; }
+                        else if (lowerVal.includes('3:4')) { setRatio('3:4'); newRatio = '3:4'; foundParam = true; }
+                        else if (lowerVal.includes('4:3')) { setRatio('4:3'); newRatio = '4:3'; foundParam = true; }
+                        else if (lowerVal.includes('16:9')) { setRatio('16:9'); newRatio = '16:9'; foundParam = true; }
+
+                        setTimeout(() => {
+                          const lowerVal = val.toLowerCase();
+                          const canGenerate = productImage && (angle === 'detail' || villaImage);
+                          const wantsGenerate = lowerVal.includes('生成') || lowerVal.includes('出图') || lowerVal.includes('重绘');
+                          const isDesignQuestion = /适合|推荐|建议|选什么|哪种|窗|色|风格/.test(lowerVal);
+
+                          if (wantsGenerate && canGenerate) {
+                            setMessages(prev => [...prev, { 
+                              role: 'assistant', 
+                              content: `收到指令。正在以 ${newRes.toUpperCase()} 分辨率和 ${newRatio} 比例开始生成方案...`,
+                            }]);
+                            generateImage();
+                          } else if (foundParam) {
+                            setMessages(prev => [...prev, { 
+                              role: 'assistant', 
+                              content: `参数已更新。当前设置：${newRes.toUpperCase()} 分辨率, ${newRatio} 比例。是否立即开始生成？`,
+                              choices: ['立即生成设计']
+                            }]);
+                          } else if (isDesignQuestion) {
+                            let response = '根据空间采光，建议选择窄边框系统窗。请上传实景图，我将为您生成多种风格的对比效果。';
+                            if (lowerVal.includes('法式')) {
+                              response = '法式风格建议选择带有格条设计的系统窗。您可以上传产品图，我将为您渲染实景效果。';
+                            } else if (lowerVal.includes('哪个') || lowerVal.includes('对比')) {
+                              response = '您可以先后上传两款产品图进行生成。我会为您保留相同的场景构图，方便您直观对比效果。';
+                            }
+                            setMessages(prev => [...prev, { 
+                              role: 'assistant', 
+                              content: response,
+                              choices: villaImage ? ['上传产品图片'] : ['上传场景图片']
+                            }]);
+                          } else {
+                            setMessages(prev => [...prev, { 
+                              role: 'assistant', 
+                              content: '我是您的智能设计助手。建议上传场景或产品图，我将为您分析并生成高精度渲染方案。',
+                              choices: ['上传场景图片', '上传产品图片']
+                            }]);
+                          }
+                        }, 800);
+                      }
+                    }}
+                  />
+                  <button className="p-2.5 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all active:scale-95">
+                    <Send size={18} />
+                  </button>
+                </div>
+              </div>
             </div>
-          </motion.div>
-        </AnimatePresence>
+          )}
         </div>
       </main>
 
