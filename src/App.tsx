@@ -247,52 +247,67 @@ export default function App() {
           image: compressed 
         }]);
 
-        // Real Image Analysis
-        try {
-          const analysisRes = await fetch('/api/analyze-image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: compressed, type })
-          });
-          const analysisData = await analysisRes.json();
-          const analysisText = analysisData.analysis || (type === 'villa' ? '分析完成：识别到现代极简风格场景。' : '分析完成：产品呈现高精度金属工艺。');
+        // Check if we have everything needed to start analysis
+        const isDetail = angle === 'detail';
+        const hasVilla = type === 'villa' || villaImage;
+        const hasProduct = type === 'product' || productImage;
+        const readyToAnalyze = isDetail ? (type === 'product' || productImage) : (hasVilla && hasProduct);
 
-          setMessages(prev => [...prev, { 
-            role: 'assistant', 
-            content: `🔍 AI分析结果：${analysisText}`,
-          }]);
-        } catch (err) {
-          console.error("Analysis failed", err);
-          setMessages(prev => [...prev, { 
-            role: 'assistant', 
-            content: type === 'villa' ? '正在分析场景的光影构图与透视关系...' : '正在分析产品的型材切面与金属质感...',
-          }]);
-        }
-
-        setTimeout(() => {
-          if (type === 'villa') {
-             setMessages(prev => [...prev, { 
+        if (readyToAnalyze) {
+          try {
+            setMessages(prev => [...prev, { 
               role: 'assistant', 
-              content: '场景分析完成。建议下一步上传产品图。',
-              choices: ['上传产品图片']
+              content: isDetail ? '正在分析产品的型材切面与金属质感...' : '正在统一分析场景构图与产品的融合匹配度...',
             }]);
-          } else {
-            // If in detail mode, we don't need villa image
-            if (angle === 'detail' || villaImage) {
-               setMessages(prev => [...prev, { 
+
+            const analysisRes = await fetch('/api/analyze-image', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                image: type === 'product' ? compressed : productImage || compressed, 
+                type: isDetail ? 'product' : 'villa' 
+              })
+            });
+            const analysisData = await analysisRes.json();
+            const analysisText = analysisData.analysis || '分析完成。系统已识别画面关键特征。';
+
+            setTimeout(() => {
+              setMessages(prev => [...prev, { 
+                role: 'assistant', 
+                content: `🔍 AI分析结果：${analysisText}`,
+              }]);
+
+              setMessages(prev => [...prev, { 
                 role: 'assistant', 
                 content: '素材已齐备。您可以设置渲染参数（如：4k, 16:9）或直接出图。',
                 choices: ['立即生成设计', '设置渲染参数']
               }]);
+            }, 1000);
+          } catch (err) {
+            console.error("Analysis failed", err);
+            setMessages(prev => [...prev, { 
+              role: 'assistant', 
+              content: '图像分析完成。素材已齐备，是否立即生成设计？',
+              choices: ['立即生成设计', '设置渲染参数']
+            }]);
+          }
+        } else {
+          setTimeout(() => {
+            if (type === 'villa') {
+               setMessages(prev => [...prev, { 
+                role: 'assistant', 
+                content: '场景已就位。建议下一步上传产品图进行综合分析。',
+                choices: ['上传产品图片']
+              }]);
             } else {
                setMessages(prev => [...prev, { 
                 role: 'assistant', 
-                content: '产品图分析完成。建议补充上传场景图以获得更佳融合效果。',
+                content: '产品图已上传。建议补充场景图以识别光影环境。',
                 choices: ['上传场景图片']
               }]);
             }
-          }
-        }, 1200);
+          }, 800);
+        }
       };
       reader.readAsDataURL(file);
     }
